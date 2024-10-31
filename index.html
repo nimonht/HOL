@@ -4,7 +4,128 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hall of T1</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+
+        .video-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1; /* Send the video behind content */
+        }
+
+        video {
+            min-width: 100%;
+            min-height: 100%;
+            object-fit: cover; /* Cover the entire background */
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center vertically */
+            align-items: center; /* Center horizontally */
+            height: 100%;
+            color: white; /* Text color */
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 3rem; /* Size of the heading */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); /* Shadow for the heading */
+        }
+
+        .scratch-container {
+            position: relative;
+            width: 300px; /* Set to desired width */
+            height: 300px; /* Set to desired height */
+            background-color: rgba(0, 0, 0, 0.7); /* Black with transparency */
+            border-radius: 10px; /* Rounded corners */
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Adjusts image size to cover the canvas */
+            transition: opacity 1s ease; /* Smooth dissolve effect */
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 10; /* On top of everything */
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        .fade-out {
+            animation: fadeOut 0.5s forwards; /* Fade out animation */
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8); /* Black with some transparency */
+            z-index: 10; /* Ensure it's on top */
+            display: none; /* Start hidden */
+        }
+    </style>
 </head>
 <body>
     <div class="video-background">
@@ -13,8 +134,8 @@
             Your browser does not support the video tag.
         </video>
     </div>
-    <div class="container">
-        <h1>Hall of TLiet</h1>
+    <div class="container h-100 d-flex flex-column justify-content-center align-items-center">
+        <h1 class="text-white">Hall of TLiet</h1>
         <div class="video-container">
             <div class="scratch-container">
                 <canvas id="scratch-canvas"></canvas>
@@ -23,15 +144,139 @@
         </div>
     </div>
 
-    <!-- Video Modal -->
-    <div id="video-modal" class="modal hidden">
-        <span class="close" id="close-modal">&times;</span>
-        <video controls autoplay id="popup-video">
-            <source src="./assets/popup.mp4" type="video/mp4"> <!-- Replace with your popup video -->
+    <div id="video-modal" class="hidden">
+        <video id="popup-video" controls>
+            <source src="./assets/popup.mp4" type="video/mp4">
             Your browser does not support the video tag.
         </video>
+        <button id="close-modal">Close</button>
     </div>
+    
+    <div id="overlay"></div>
 
-    <script src="script.js"></script>
+    <!-- Bootstrap JS (and Popper.js if you need) -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        const canvas = document.getElementById("scratch-canvas");
+        const ctx = canvas.getContext("2d");
+        const revealImage = document.getElementById("reveal-image");
+        const videoModal = document.getElementById("video-modal");
+        const popupVideo = document.getElementById("popup-video");
+        const closeModal = document.getElementById("close-modal");
+        const backgroundVideo = document.getElementById("background-video");
+    
+        // Hide the background video initially
+        backgroundVideo.style.display = "none";
+    
+        canvas.width = 300; // Same as your CSS width
+        canvas.height = 300; // Same as your CSS height
+    
+        // Draw initial scratchable layer
+        ctx.fillStyle = "gray"; // Color of the scratch-off layer
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+        // Scratch function
+        let isDrawing = false;
+    
+        // Mouse event listeners
+        canvas.addEventListener("mousedown", (e) => {
+            isDrawing = true;
+            scratch(e);
+        });
+        canvas.addEventListener("mousemove", (e) => {
+            if (isDrawing) {
+                scratch(e);
+            }
+        });
+        canvas.addEventListener("mouseup", () => {
+            isDrawing = false;
+            backgroundVideo.pause(); // Pause the background video when the user stops scratching
+        });
+    
+        // Touch event listeners
+        canvas.addEventListener("touchstart", (e) => {
+            isDrawing = true;
+            scratch(e.touches[0]); // Use the first touch point
+            e.preventDefault(); // Prevent default behavior (like scrolling)
+        });
+        canvas.addEventListener("touchmove", (e) => {
+            if (isDrawing) {
+                scratch(e.touches[0]); // Use the first touch point
+                e.preventDefault(); // Prevent default behavior
+            }
+        });
+        canvas.addEventListener("touchend", () => {
+            isDrawing = false;
+            backgroundVideo.pause(); // Pause the background video when the user stops scratching
+        });
+    
+        // Scratch off the canvas
+        function scratch(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.clientX === 0) ? e.clientX - rect.left : e.touches[0].clientX - rect.left; // Use touch coordinates
+            const y = (e.clientY || e.clientY === 0) ? e.clientY - rect.top : e.touches[0].clientY - rect.top; // Use touch coordinates
+    
+            ctx.globalCompositeOperation = "destination-out"; // Makes the scratched area transparent
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, Math.PI * 2, false); // Adjust the radius as needed
+            ctx.fill();
+    
+            // Play background video (but keep it hidden)
+            if (backgroundVideo.paused) { // Only play if it's paused
+                backgroundVideo.style.display = "block"; // Show the background video
+                backgroundVideo.play(); // Play the background video
+            }
+    
+            // Check if enough area has been scratched off
+            checkIfScratched(); 
+        }
+    
+        // Check if enough area has been scratched off
+        function checkIfScratched() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let totalPixels = imageData.data.length / 4;
+            let scratchedPixels = 0;
+    
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                if (imageData.data[i + 3] === 0) {
+                    scratchedPixels++;
+                }
+            }
+    
+            if (scratchedPixels / totalPixels > 0.3) { // If more than 50% is scratched
+                revealImage.classList.remove("hidden"); // Show the reveal image
+                showModal(); // Show the video modal
+            }
+        }
+    
+        // Show the video modal
+        function showModal() {
+            videoModal.classList.remove("hidden"); // Show modal
+            document.body.style.overflow = "hidden"; // Prevent background scroll
+            popupVideo.currentTime = 0; // Reset video to the beginning
+            popupVideo.play(); // Play the popup video
+    
+            // Remove any existing event listeners to avoid duplicates
+            popupVideo.removeEventListener('ended', hideModal); 
+            // Add the new event listener
+            popupVideo.addEventListener('ended', hideModal); 
+        }
+    
+        // Function to hide modal
+        function hideModal() {
+            videoModal.classList.add("hidden"); // Hide modal
+            document.body.style.overflow = "auto"; // Allow background scroll
+            backgroundVideo.style.display = "none"; // Hide the background video after modal is closed
+        }
+    
+        // Close the modal
+        closeModal.onclick = function () {
+            hideModal();
+            popupVideo.pause(); // Pause video
+            popupVideo.currentTime = 0; // Reset video to the beginning
+        }
+    </script>    
 </body>
 </html>
